@@ -14,6 +14,10 @@ func check(e error) {
 	}
 }
 
+/*
+*Input: Takes file path of the input text.
+*output: List of the words in the file.
+*/
 func getWords(filePath string) ([]string, error) {
 	file, err := os.Open(filePath)
 	check(err)
@@ -41,7 +45,16 @@ func shuffle(words []string) {
 	}
 }
 
-func slices(listLen int, noWorkers int) []int {
+/*
+* The function returns the number of words for that each worker should work on.
+* It simply divides the number of total words and distributed the remainder equally.
+*
+* Input: Lenght of the list and the number of workers for the list.
+*
+* Output: A list, with the number of words for each worker.
+*
+*/
+func createSegments(listLen int, noWorkers int) []int {
 
 	if noWorkers <= 0 {
 		panic("Values error in slices function")
@@ -51,70 +64,82 @@ func slices(listLen int, noWorkers int) []int {
 		panic("less words than workers")
 	}
 
-	sliceSize := listLen / noWorkers
+	segmentsSize := listLen / noWorkers
+
+  //Extra remainder words.
 	extra := listLen % noWorkers
 
-	slicesList := make([]int, noWorkers)
+	segmentsList := make([]int, noWorkers)
 
 	for i := 0; i < noWorkers; i++ {
-		end := sliceSize
+		end := segmentsSize
+
+    //Distriburtes the remainder to the first slices.
 		if extra > 0 {
 			end++
 			extra--
 		}
-		slicesList[i] = end
+		segmentsList[i] = end
 	}
 
-	return slicesList
+	return segmentsList
 }
 
-func worker(inputChan chan string, sliceLen int, doneChan chan bool, channelsList []chan string) {
+func worker(inputChan chan string, segmentLen int, doneChan chan bool, channelsList []chan string) {
 
-	slice := make([]string, sliceLen)
-	for i := 0; i < sliceLen; i++ {
-		slice[i] = <-inputChan
+	segment := make([]string, segmentLen)
+
+  //Collect the words in the shared unbuffered channel.
+	for i := 0; i < segmentLen; i++ {
+		segment[i] = <-inputChan
 	}
 
-	shuffle(slice)
+	shuffle(segment)
 
-	for _, word := range slice {
+  //Write in a random channel.
+	for _, word := range segment {
 		insertWord(channelsList, word)
 	}
+
+  //Communicte that the routine is done.
 	doneChan <- true
 }
 
+/*
+* Input: A list of channels and a word to insert.
+*
+* Inserts one word into one of the channels, choosen at random.
+*
+*/
 func insertWord(channelList []chan string, word string) {
 	index := rand.Intn(len(channelList))
 	channelList[index] <- word
 }
 
-func removeElement(slice []chan string, index int) ([]chan string, error) {
-	if index < 0 || index >= len(slice) {
-		return nil, fmt.Errorf("Index out of range")
-	}
-
-	return append(slice[:index], slice[index+1:]...), nil
-}
-
+/*
+* Input: Slice with the text to shuffle and the number of workers.
+*
+* Output: Slice with the shuffled text.
+*
+* The function starts the routines and collects the result.
+*/
 func textShuffle(wordsList []string, workersNumber int) []string {
 
-	//Channel that will store initial text to shuffle.
-	initialChan := make(chan string)
+	initialChan := make(chan string) // Initial text to shuffle.
+	doneChan := make(chan bool, workersNumber) // Channel used to wait routines.
+  
+  //List of channels that will be filled by workers.
+	workersChannels := make([]chan string, len(segments))
+  
+  segments := createSegments(len(wordsList), workersNumber) //List of segments for each worker.
 
-	//Channel used to wait all workers to stop.
-	doneChan := make(chan bool, workersNumber)
-
-	//Each worker will have a portion of the original list of words.
-	slices := slices(len(wordsList), workersNumber)
-
-	//List of channels that will be filled by workers.
-	workersChannels := make([]chan string, len(slices))
-
-	for index, slice := range slices {
+  //Start workers and create channels.
+	for index, segment := range segments {
 		workersChannels[index] = make(chan string, len(wordsList))
-		go worker(initialChan, slice, doneChan, workersChannels)
+		go worker(initialChan, segment, doneChan, workersChannels)
 	}
 
+  //Distribute words between workers concurrently on an unbuffered channel.
 	go func() {
 		for _, word := range wordsList {
 			initialChan <- word
@@ -122,13 +147,14 @@ func textShuffle(wordsList []string, workersNumber int) []string {
 		close(initialChan)
 	}()
 
-	// Wait for all workers to finish
+	//Wait for all workers to finish.
 	for i := 0; i < workersNumber; i++ {
 		<-doneChan
 	}
 
 	var result []string
-
+  
+  //Fill the returned list.
 	for _, channel := range workersChannels {
 		close(channel)
 		for word := range channel {
@@ -139,7 +165,11 @@ func textShuffle(wordsList []string, workersNumber int) []string {
 	return result
 }
 
-// Appends the passed list of strings.
+/*
+* Input: File path where the shuffled sequence will be written.
+* 
+* Utility function used just to debug or check results of the program over long runs.
+*/
 func appendToFile(filePath string, lines []string) error {
 	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
