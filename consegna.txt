@@ -1,0 +1,4 @@
+# 07 - Words shuffle
+#
+Write a Google Go program that shuffle the words in a text by exploiting 
+go-routines running in parallel and message passing communication only.

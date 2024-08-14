@@ -1,0 +1,1 @@
+questo è un semplice testo di prova per vedere come vengono ordinate le parole, temo che queste vengano ordinate seguendo degli pseudo pattern che non rendono veramente randomica la distribuzione. Questo è dovuto a come vengono schedulate le routine
