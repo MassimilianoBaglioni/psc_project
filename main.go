@@ -68,10 +68,7 @@ func slices(listLen int, noWorkers int) []int {
 	return slicesList
 }
 
-func worker(inputChan chan string, sliceLen int, doneChan chan bool, channelList []chan string) {
-
-	channelsListCopy := make([]chan string, len(channelList))
-	copy(channelsListCopy, channelList)
+func worker(inputChan chan string, sliceLen int, doneChan chan bool, channelsList []chan string) {
 
 	slice := make([]string, sliceLen)
 	for i := 0; i < sliceLen; i++ {
@@ -81,26 +78,14 @@ func worker(inputChan chan string, sliceLen int, doneChan chan bool, channelList
 	shuffle(slice)
 
 	for _, word := range slice {
-		insertWord(channelsListCopy, word)
-		fmt.Println("in the for")
+		insertWord(channelsList, word)
 	}
-	fmt.Println("outta")
 	doneChan <- true
 }
 
 func insertWord(channelList []chan string, word string) {
 	index := rand.Intn(len(channelList))
-	inserted := false
-
-	for !inserted {
-		select {
-		case channelList[index] <- word:
-			inserted = true
-		default:
-			removeElement(channelList, index)
-			index = rand.Intn(len(channelList))
-		}
-	}
+	channelList[index] <- word
 }
 
 func removeElement(slice []chan string, index int) ([]chan string, error) {
@@ -126,7 +111,7 @@ func textShuffle(wordsList []string, workersNumber int) []string {
 	workersChannels := make([]chan string, len(slices))
 
 	for index, slice := range slices {
-		workersChannels[index] = make(chan string, slice)
+		workersChannels[index] = make(chan string, len(wordsList))
 		go worker(initialChan, slice, doneChan, workersChannels)
 	}
 
