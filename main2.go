@@ -68,37 +68,58 @@ func slices(listLen int, noWorkers int) []int {
 	return slicesList
 }
 
-func worker(outputChan chan string, inputChan chan string, sliceLen int, doneChan chan bool) {
-	fmt.Println("Worker started")
+func worker(inputChan chan string, sliceLen int, doneChan chan bool, channelList []chan string, id int) {
+
+  channelsListCopy := make([]chan string, len(channelList))
+  copy(channelsListCopy, channelList)
+
 	slice := make([]string, sliceLen)
 	for i := 0; i < sliceLen; i++ {
 		slice[i] = <-inputChan
 	}
 
-	fmt.Println("slice: ", slice)
-	//time.Sleep(time.Duration(rand.Intn(2)) * time.Second)
 	shuffle(slice)
+
 	for _, word := range slice {
-		outputChan <- word
+    insertWord(channelsListCopy, word)
 	}
 	doneChan <- true
 }
 
-func main(){
-	rand.Seed(time.Now().UnixNano())
+func insertWord(channelList []chan string, word string){
+  index := rand.Intn(len(channelList))
+  inserted := false
+  
+  for !inserted{
+    select{
+    case channelList[index] <- word:
+      inserted = true
+    default:
+      removeElement(channelList, index)
+      index = rand.Intn(len(channelList))
+    }
+  }
+}
 
-	wordsList, err := getWords("./text.txt")
-	check(err)
+func removeElement(slice []chan string, index int)([]chan string, error){
+  if index < 0 || index >= len(slice){
+    return nil, fmt.Errorf("Index out of range")
+  }
+  
+  return append(slice[:index], slice[index+1:]...),nil
+}
 
-	workersNumber := 3
+func textShuffle(wordsList []string, workersNumber int) []string{
 
 	sortedChan := make(chan string)
 	doneChan := make(chan bool, workersNumber)
   slices := slices(len(wordsList), workersNumber)
- 	shuffledChan := make(chan string, len(wordsList)) // Buffer the shuffledChan to prevent blocking
- 
-  for _, slice := range slices {
-		go worker(shuffledChan, sortedChan, slice, doneChan)
+
+  workersChannels := make([]chan string, len(slices)) //list of channels that workers will fill
+  
+  for index, slice := range slices {
+		workersChannels[index] = make(chan string, slice)
+    go worker(sortedChan, slice, doneChan, workersChannels, index)
 	}
   
   go func() {
@@ -111,14 +132,67 @@ func main(){
 	// Wait for all workers to finish
 	for i := 0; i < workersNumber; i++ {
     <-doneChan
-		fmt.Println("Done")
 	}
-  close(shuffledChan)
 
-  for word := range(shuffledChan){
-    fmt.Println(word)
+  var result []string
+  
+  for _, channel := range(workersChannels) {
+    close(channel)
+    for word := range(channel){
+      result = append(result, word)
+    }
   }
 
+  return result
+}
+
+func appendToFile(filePath string, lines []string) error {
+	// Open the file in append mode, create if it does not exist, and set permissions.
+	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("error opening file: %w", err)
+	}
+	defer file.Close()
+
+	// Create a buffered writer for efficient writing.
+	writer := bufio.NewWriter(file)
+
+	// Write each line to the file with a newline.
+	for _, line := range lines {
+		if _, err := writer.WriteString(line + "\n"); err != nil {
+			return fmt.Errorf("error writing to file: %w", err)
+		}
+	}
+	
+  if _, err := writer.WriteString("-------------" + "\n"); err != nil {
+			return fmt.Errorf("error writing to file: %w", err)
+	}
+
+	// Flush buffered writer to ensure all data is written.
+	if err := writer.Flush(); err != nil {
+		return fmt.Errorf("error flushing writer: %w", err)
+	}
+
+	return nil
+}
+
+func main(){
+	rand.Seed(time.Now().UnixNano())
+  
+  wordsList, err := getWords("./text.txt")
+	check(err)
+
+  workersNumber1 := rand.Intn(len(wordsList))
+  workersNumber2 := rand.Intn(len(wordsList))
+
+  fmt.Println("Specs:")
+  fmt.Println("First pass ", workersNumber1, " workers")
+  fmt.Println("Second pass ", workersNumber2, " workers")
+  fmt.Println("On ", len(wordsList), " words")
+  
+  shuffledText := textShuffle(textShuffle(wordsList,workersNumber1), workersNumber2)
+  fmt.Println(shuffledText)
+  appendToFile("./output.txt", shuffledText)
 }
 
 
