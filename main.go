@@ -128,10 +128,10 @@ func textShuffle(wordsList []string, workersNumber int) []string {
 	initialChan := make(chan string) // Initial text to shuffle.
 	doneChan := make(chan bool, workersNumber) // Channel used to wait routines.
   
+  segments := createSegments(len(wordsList), workersNumber) //List of segments for each worker.
+  
   //List of channels that will be filled by workers.
 	workersChannels := make([]chan string, len(segments))
-  
-  segments := createSegments(len(wordsList), workersNumber) //List of segments for each worker.
 
   //Start workers and create channels.
 	for index, segment := range segments {
@@ -197,13 +197,17 @@ func appendToFile(filePath string, lines []string) error {
 }
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
+  start := time.Now()
+  rand.Seed(time.Now().UnixNano())
 
 	wordsList, err := getWords("./text.txt")
 	check(err)
 
-	workersNumber1 := rand.Intn(len(wordsList)-1) + 1
-	workersNumber2 := rand.Intn(len(wordsList)-1) + 1
+	//workersNumber1 := rand.Intn(len(wordsList)-1) + 1
+	//workersNumber2 := rand.Intn(len(wordsList)-1) + 1
+
+  workersNumber1 := 3
+	workersNumber2 := 3
 
 	fmt.Println("Specs:")
 	fmt.Println("First pass ", workersNumber1, " workers")
@@ -211,6 +215,7 @@ func main() {
 	fmt.Println("On ", len(wordsList), " words")
 
 	shuffledText := textShuffle(textShuffle(wordsList, workersNumber1), workersNumber2)
-	fmt.Println(shuffledText)
+  fmt.Println(time.Since(start))
+	//fmt.Println(shuffledText)
 	appendToFile("./output.txt", shuffledText)
 }
