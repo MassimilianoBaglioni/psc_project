@@ -17,6 +17,8 @@ To make the process completely random and unpredictable, another run of the same
 
 In short, the main issue was the fact that words were kept in blocks of the size of routines, so basically there were shuffles local to this blocks. The interleaving of the routines was not enough to grant a completely unpredictable shuffle of the words, so i preferred to increase calculations to grant more randomization. To overcome the issue, the previous solution was the one that i thought fitted the best in this case, even though I'm sure some better solution exists. 
 
+Another approach i tried was by using the switch statement, but even that grouped words by bursts and made it pretty predicibile and not enough random for what i was looking for. 
+
 
 ///
 Introduction
