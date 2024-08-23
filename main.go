@@ -180,12 +180,12 @@ func appendToFile(filePath string, lines []string) error {
 	writer := bufio.NewWriter(file)
 
 	for _, line := range lines {
-		if _, err := writer.WriteString(line + "\n"); err != nil {
+		if _, err := writer.WriteString(line + " "); err != nil {
 			return fmt.Errorf("error writing to file: %w", err)
 		}
 	}
 
-	if _, err := writer.WriteString("-------------" + "\n"); err != nil {
+	if _, err := writer.WriteString("\n" + "-------------" + "\n"); err != nil {
 		return fmt.Errorf("error writing to file: %w", err)
 	}
 
@@ -196,18 +196,49 @@ func appendToFile(filePath string, lines []string) error {
 	return nil
 }
 
+/*
+* 
+* Input: number of words in the input text to shuffle and the max number of workers accepted.
+* 
+* The function returns a random number (used as number of worker routines to spawn) that is never
+* bigger than the number of words and never higher than the given max number of workers decided by
+* the second parameter.
+*/
+func randomWorkerNumber(words int, maxWorkers int) int{
+  if maxWorkers < 0{
+    maxWorkers = -maxWorkers
+  }
+
+  if maxWorkers == 0 {
+    return 1
+  }
+
+  if words < maxWorkers{
+    return words
+  }
+
+  return rand.Intn(maxWorkers) + 1 
+}
+
 func main() {
   start := time.Now()
   rand.Seed(time.Now().UnixNano())
 
 	wordsList, err := getWords("./text.txt")
-	check(err)
+  
+  if len(wordsList) == 0{
+    fmt.Println("No words to shuffle")
+    return
+  }
+	
+  check(err)
 
-	//workersNumber1 := rand.Intn(len(wordsList)-1) + 1
-	//workersNumber2 := rand.Intn(len(wordsList)-1) + 1
+	workersNumber1 := randomWorkerNumber(len(wordsList), 10)
+	workersNumber2 := randomWorkerNumber(len(wordsList), 10)
 
-  workersNumber1 := 3
-	workersNumber2 := 3
+  //Comment the random generated to hardcode the number of routines.
+  //workersNumber1 := 3
+	//workersNumber2 := 3
 
 	fmt.Println("Specs:")
 	fmt.Println("First pass ", workersNumber1, " workers")
